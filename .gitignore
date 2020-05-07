@@ -1,0 +1,48 @@
+
+# -*- EDITORS -*-
+
+.vscode/
+
+
+# -*- COMPILING  -*-
+
+# C Objects
+*.o
+
+# C targets
+*.a
+*.so
+*.lib
+*.la
+*.dll
+
+
+# -*- GENERATED -*-
+
+# by ./configure
+/Makefile
+/include/ntt-config.h
+
+# misc. folders for targets
+/lib/
+/bin/
+
+# extra library things
+/.tmp/
+
+# other directories
+/build/
+
+# build output
+/*.tar.*
+/*.tar
+
+
+# -*- DEBIAN FILES -*-
+
+# temporary files
+/debian/usr
+
+# output from debian
+*.deb
+
