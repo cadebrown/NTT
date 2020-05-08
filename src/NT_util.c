@@ -36,7 +36,6 @@ int64_t ntt_egcd(int64_t a, int64_t b, int64_t* xy) {
 }
 
 
-
 // Return a^-1 (mod N)
 // Or, return '0' if there was no inverse (i.e. it was not invertible)
 int64_t ntt_modinv(int64_t a, int64_t N) {
@@ -52,6 +51,18 @@ int64_t ntt_modinv(int64_t a, int64_t N) {
     }
 }
 
+
+// Calculate a*b (mod m)
+uint64_t ntt_modmul(uint64_t a, uint64_t b, uint64_t m) {
+    int64_t res = 0;
+    while (a != 0) {
+        if (a & 1) res = (res + b) % m;
+        a >>= 1;
+        b = (b << 1) % m;
+    }
+    return res;
+}
+
 // Calculate a^b (mod m)
 int64_t ntt_modpow(int64_t a, int64_t b, int64_t m) {
     if (b < 0) {
@@ -62,43 +73,48 @@ int64_t ntt_modpow(int64_t a, int64_t b, int64_t m) {
         // return it using positive branch
         return ntt_modpow(a_inv, -b, m);
     } else {
-        // positive power
+        // convert to the right range
         a %= m;
         if (a < 0) a += m;
 
         // result
-        uint64_t res = 1;
+        int64_t res = 1;
 
         // now, calculate using repeated squaring
         while (b > 0) {
-            if (b & 1) {
+            /*if (m == 4309503329) {
+                printf("%lli::%lli,%lli\n", res, a, b);
+            }*/
+            if (b % 2 == 1) {
                 // multiply by active bit
-                res = (res * a) % m;
+                res = ntt_modmul(res, a, m);
             }
 
             // repeated squaring
-            a = (a * a) % m;
-            b >>= 1;
+            a = ntt_modmul(a, a, m);
+            b /= 2;
         }
 
         // ensure result is positive
         if (res < 0) res += m;
         return res;
-
     }
 }
 
 /// Internal miller rabin trial test
-static bool i_milrab(uint64_t n, int64_t a) {
+static bool i_milrab(int64_t n, int64_t a) {
+
+
+    if (n % a == 0) return false;
 
     // Decompose: n = 2^r * d + 1
-    int r = 0;
-    uint64_t d = n - 1;
+    int64_t r = 0;
+    int64_t d = n - 1;
 
     // take out powers of 2
     while (d % 2 == 0) {
-        r += 1;
-        d >>= 1;
+        r++;
+        d /= 2;
     }
 
     // calculate a^d (mod n)
@@ -108,10 +124,10 @@ static bool i_milrab(uint64_t n, int64_t a) {
         // still might be prime
         return true;
     } else {
-        int i;
+        int64_t i;
         // complete the test 'r-1' times
         for (i = 0; i < r - 1; ++i) {
-            x = (x * x) % n;
+            x = ntt_modmul(x, x, n);
             // still might be prime
 
             if (x == n - 1) return true;
@@ -165,8 +181,8 @@ int64_t ntt_tot(int64_t n) {
 
 
 // Factor(n), yielding only unique prime factors
-int ntt_factor_uup(int64_t n, int64_t** facts) {
-    int nfacs = 0;
+int64_t ntt_factor_uup(int64_t n, int64_t** facts) {
+    int64_t nfacs = 0;
 
     // macro to add a factor
     #define ADD_FAC(_x) { \
@@ -175,7 +191,7 @@ int ntt_factor_uup(int64_t n, int64_t** facts) {
         (*facts)[nfacs - 1] = (_x); \
     }
 
-    int oN = n;
+    int64_t oN = n;
 
     if (n % 2 == 0) ADD_FAC(2);
     if (n % 3 == 0) ADD_FAC(3);
@@ -219,14 +235,13 @@ int64_t ntt_prim_root_unity(int64_t n) {
 
     // totient factors
     int64_t* tot_facts = NULL;
-    int tot_n_facts = ntt_factor_uup(tot, &tot_facts);
-
+    int64_t tot_n_facts = ntt_factor_uup(tot, &tot_facts);
+    
     // keep testing out tries
     int64_t a = 2;
     while (a <= n) {
         // whether it equalled one
-        int eq1 = 0;
-        int i;
+        int64_t eq1 = 0, i;
         for (i = 0; i < tot_n_facts; ++i) {
             // calculate: a^(phi(n)/p_i) (mod p)
             int64_t r = ntt_modpow(a, tot / tot_facts[i], n);
@@ -249,7 +264,6 @@ int64_t ntt_prim_root_unity(int64_t n) {
     return 0;
 }
 
-
 // Calculate n'th root of unity mod p
 int64_t ntt_nth_root_unity(int64_t n, int64_t p) {
     int64_t i;
@@ -258,7 +272,6 @@ int64_t ntt_nth_root_unity(int64_t n, int64_t p) {
             return i;
         }
     }
-
     // no nth root of unity found!
     return 0;
 

@@ -9,6 +9,16 @@
 
 // shuffle a sequence with bit-reversal index mapping
 static void shuffle_bitrev(int64_t* inp, int64_t N) {
+    int64_t oN = N;
+
+    N = 1;
+    while (N < oN) {
+        N *= 2;
+    }
+
+    // not power of 2
+    if (N != oN) return;
+
     int64_t i, j = 0;
     for (i = 1; i < N; ++i) {
         int64_t b = (N >> 1);
@@ -40,9 +50,14 @@ void ntt_plan_bfly_init(ntt_plan_bfly_t* plan, int64_t N, int64_t p) {
     plan->p = p;
     plan->N_inv = ntt_modinv(N, p);
 
+
     // allocate twiddle tables
     plan->W = realloc(plan->W, sizeof(*plan->W) * N);
     plan->IW = realloc(plan->IW, sizeof(*plan->IW) * N);
+
+    // bit reversed
+    plan->W_br = realloc(plan->W_br, sizeof(*plan->W_br) * N);
+
 
     int64_t k = (p - 1) / N;
 
@@ -59,6 +74,10 @@ void ntt_plan_bfly_init(ntt_plan_bfly_t* plan, int64_t N, int64_t p) {
         plan->W[i] = ntt_modpow(w, i, p);
         plan->IW[i] = ntt_modpow(w_inv, i, p);
     }
+
+    memcpy(plan->W_br, plan->W, sizeof(*plan->W) * N);
+    shuffle_bitrev(plan->W_br, N);
+
 }
 
 // Do forward NTT:
@@ -66,21 +85,43 @@ void ntt_plan_bfly_init(ntt_plan_bfly_t* plan, int64_t N, int64_t p) {
 void ntt_plan_bfly_NTT(ntt_plan_bfly_t* plan, int64_t* inp, int64_t* out) {
     // do in place on output
     memcpy(out, inp, sizeof(*inp) * plan->N);
-    shuffle_bitrev(out, plan->N);
 
     // store plan variables as locals
     int64_t N = plan->N, p = plan->p;
 
-    // current transform size (powers of 2)
-    int64_t m = 2;
-
     // temporary vvariables
-    int64_t i, j, a, b;
+    int64_t i, j, k, a, b, U, V;
+
+    // current transform size (powers of 2)
+    int64_t m = 1, t = N / 2;
+
+
+    /*
+    while (m <= N) {
+        int64_t m2 = m / 2;
+        k = 0;
+
+        for (i = 0; i < m2; ++i) {
+            int64_t S = plan->W[i * N / m];
+            for (j = k; j < k + t; j++) {
+                U = out[j];
+                V = out[j + t] * S;
+                out[j] = (U + V) % p;
+                out[j + t] = (U - V) % p;
+                if (out[j + t] < 0) out[j + t] += p;
+            }
+            k += 2 * t;
+        }
+        t /= 2;
+        m *= 2;
+    }*/
+
+    // reverse output
+    shuffle_bitrev(out, plan->N);
 
     while (m <= N) {
         int64_t m2 = m / 2;
 
-        int64_t t;
         for (t = 0; t < m2; ++t) {
             // current root of unity
             int64_t wi = plan->W[t * N / m];
@@ -88,6 +129,7 @@ void ntt_plan_bfly_NTT(ntt_plan_bfly_t* plan, int64_t* inp, int64_t* out) {
             // inner transform
             int64_t g;
             for (g = 0; g < N / m; ++g) {
+
                 i = g * m + t;
                 j = i + m2;
                 a = out[i];
@@ -98,6 +140,7 @@ void ntt_plan_bfly_NTT(ntt_plan_bfly_t* plan, int64_t* inp, int64_t* out) {
             }
         }
 
+        t /= 2;
         m *= 2;
     }
 

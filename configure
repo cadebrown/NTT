@@ -417,8 +417,6 @@ $(ntt_BIN): $(libntt_SHARED) $(ntt_O)
 	{"cp $(libntt_SHARED).$(NTT_VERSION) $(dir $@)" if "NTT__WINDOWS" in defs or "NTT__CYGWIN" in defs else ""}
 	{MAKE_success}
 
-
-
 """)
 
 	f_Makefile.close()

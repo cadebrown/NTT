@@ -89,9 +89,12 @@ typedef struct {
     int64_t* W;
     int64_t* IW;
 
+    // bit reversed
+    int64_t* W_br;
+
 } ntt_plan_bfly_t;
 
-#define NTT_PLAN_BFLY_EMPTY ((ntt_plan_bfly_t){ .N = 0, .p = 0, .W = 0 })
+#define NTT_PLAN_BFLY_EMPTY ((ntt_plan_bfly_t){ .N = 0, .p = 0, .W = NULL, .IW = NULL, .W_br = NULL })
 
 //
 void ntt_plan_bfly_init(ntt_plan_bfly_t* plan, int64_t N, int64_t p);
@@ -104,6 +107,52 @@ void ntt_plan_bfly_NTT(ntt_plan_bfly_t* plan, int64_t* inp, int64_t* out);
 // out = INTT(inp)
 void ntt_plan_bfly_INTT(ntt_plan_bfly_t* plan, int64_t* inp, int64_t* out);
 
+
+
+// ntt_multer_t - helper class for multiplying 2 sequences
+typedef struct {
+
+    // N, the size of each input (may be rounded to a power of 2)
+    int64_t N;
+
+    // product of all 'p''s from the plans
+    int64_t prod_p;
+
+    // number of NTT-plans for multiplication
+    int n_plans;
+
+    // array of plans
+    ntt_plan_bfly_t* plans;
+
+    // CRT (Chinese Remainder Theorem) data for each 'p' for each plan
+    struct {
+
+        // Ni = prod_p / p
+        int64_t Ni;
+
+        // d = Ni^-1 (mod p)
+        int64_t d;
+
+    }* CRT_p;
+
+
+    // temp buffers for NTTs
+    int64_t** nttA;
+    int64_t** nttB;
+    int64_t** nttC;
+    int64_t** C;
+
+} ntt_multer_t;
+
+
+// empty multiplier
+#define NTT_MULTER_EMPTY ((ntt_multer_t){ .N = 0, .plans = NULL, .n_plans = 0, .nttA = NULL, .nttB = NULL, .nttC = NULL })
+
+// Create a multiplyer
+void ntt_multer_init(ntt_multer_t* multer, int64_t N);
+
+// Set 'C = A * B' through convolution
+void ntt_multer_mult(ntt_multer_t* multer, int64_t* A, int64_t* B, int64_t* C);
 
 
 /* NTT NT utils */
@@ -119,6 +168,9 @@ NTT_API int64_t ntt_egcd(int64_t a, int64_t b, int64_t* xy);
 // Compute a^-1 (mod N), which, by definition means: (a * (a^-1)) = 1 (mod N)
 // NOTE: Returns '0' if 'a' is not invertible (mod N)
 NTT_API int64_t ntt_modinv(int64_t a, int64_t N);
+
+// Calculate a*b (mod m)
+NTT_API uint64_t ntt_modmul(uint64_t a, uint64_t b, uint64_t m);
 
 // Compute a^b (mod N) (always returning positive)
 // NOTE: If 'b<0', then modular inversing is used. The result will be '-1' if no
@@ -148,7 +200,7 @@ NTT_API int64_t ntt_nth_root_unity(int64_t n, int64_t p);
 // Return the number of factors, and set (*facts)[:] to the factors
 // NOTE: *facts can be NULL, and will be allocated using 'realloc',
 //   so only use 'free' with it afterwards
-NTT_API int ntt_factor_uup(int64_t n, int64_t** facts);
+NTT_API int64_t ntt_factor_uup(int64_t n, int64_t** facts);
 
 
 
