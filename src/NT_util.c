@@ -198,6 +198,7 @@ int64_t ntt_factor_uup(int64_t n, int64_t** facts) {
 
     // max to check
     int64_t mxN = n / 2;
+    //int64_t mxN = (int64_t)floor(sqrt(n));
 
     int64_t i = 5;
     while (i <= mxN) {

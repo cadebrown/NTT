@@ -38,7 +38,7 @@ args = parser.parse_args()
 # -*- Config Vars
 
 CC        = os.environ.get("CC",        "cc")
-CFLAGS    = os.environ.get("CFLAGS",    "-O3 -std=c99")
+CFLAGS    = os.environ.get("CFLAGS",    "-Ofast -fopenmp -std=c99")
 LDFLAGS   = os.environ.get("LDFLAGS",   "")
 
 PREFIX    = args.prefix if args.prefix else os.environ.get("PREFIX",    "/usr/local")

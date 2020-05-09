@@ -10,7 +10,7 @@ st = time.time()
 C = A * B
 st = time.time() - st
 
-print ("time: %.3f" % (st, ))
-#print (hex(C))
+print ("time: %.3f" % (st, ), file=sys.stderr)
+print (hex(C))
 
 

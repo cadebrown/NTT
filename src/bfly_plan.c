@@ -50,14 +50,12 @@ void ntt_plan_bfly_init(ntt_plan_bfly_t* plan, int64_t N, int64_t p) {
     plan->p = p;
     plan->N_inv = ntt_modinv(N, p);
 
-
     // allocate twiddle tables
     plan->W = realloc(plan->W, sizeof(*plan->W) * N);
     plan->IW = realloc(plan->IW, sizeof(*plan->IW) * N);
 
     // bit reversed
     plan->W_br = realloc(plan->W_br, sizeof(*plan->W_br) * N);
-
 
     int64_t k = (p - 1) / N;
 
@@ -68,16 +66,19 @@ void ntt_plan_bfly_init(ntt_plan_bfly_t* plan, int64_t N, int64_t p) {
     int64_t w = ntt_modpow(rt_p, k, p);
     int64_t w_inv = ntt_modinv(w, p);
 
+    int64_t Wi = 1, Wi_inv = 1;
+
     // caculate twiddle factors w^i (mod p)
     int64_t i;
     for (i = 0; i < N; ++i) {
-        plan->W[i] = ntt_modpow(w, i, p);
-        plan->IW[i] = ntt_modpow(w_inv, i, p);
+        plan->W[i] = Wi;
+        plan->IW[i] = Wi_inv;
+        Wi = ntt_modmul(Wi, w, p);
+        Wi_inv = ntt_modmul(Wi_inv, w_inv, p);
     }
 
-    memcpy(plan->W_br, plan->W, sizeof(*plan->W) * N);
-    shuffle_bitrev(plan->W_br, N);
-
+    //memcpy(plan->W_br, plan->W, sizeof(*plan->W) * N);
+    //shuffle_bitrev(plan->W_br, N);
 }
 
 // Do forward NTT:
@@ -85,62 +86,36 @@ void ntt_plan_bfly_init(ntt_plan_bfly_t* plan, int64_t N, int64_t p) {
 void ntt_plan_bfly_NTT(ntt_plan_bfly_t* plan, int64_t* inp, int64_t* out) {
     // do in place on output
     memcpy(out, inp, sizeof(*inp) * plan->N);
+    shuffle_bitrev(out, plan->N);
 
     // store plan variables as locals
     int64_t N = plan->N, p = plan->p;
 
-    // temporary vvariables
-    int64_t i, j, k, a, b, U, V;
+    // temporary variables
+    int64_t i, j, U, V;
 
     // current transform size (powers of 2)
-    int64_t m = 1, t = N / 2;
+    int64_t m = 1;
 
-
-    /*
     while (m <= N) {
         int64_t m2 = m / 2;
-        k = 0;
+        int64_t bnd = (N / m) * m;
 
         for (i = 0; i < m2; ++i) {
-            int64_t S = plan->W[i * N / m];
-            for (j = k; j < k + t; j++) {
-                U = out[j];
-                V = out[j + t] * S;
-                out[j] = (U + V) % p;
-                out[j + t] = (U - V) % p;
-                if (out[j + t] < 0) out[j + t] += p;
-            }
-            k += 2 * t;
-        }
-        t /= 2;
-        m *= 2;
-    }*/
-
-    // reverse output
-    shuffle_bitrev(out, plan->N);
-
-    while (m <= N) {
-        int64_t m2 = m / 2;
-
-        for (t = 0; t < m2; ++t) {
             // current root of unity
-            int64_t wi = plan->W[t * N / m];
+            int64_t wi = plan->W[i * N / m];
 
-            // inner transform
-            int64_t g;
-            for (g = 0; g < N / m; ++g) {
+            // interio transform
+            for (j = i; j < bnd + i; j += m) {
+                U = out[j];
+                V = (out[j + m2] * wi) % p;
 
-                i = g * m + t;
-                j = i + m2;
-                a = out[i];
-                b = out[j] * wi;
-
-                out[i] = (a + b) % p;
-                out[j] = (a - b) % p;
+                out[j] = (U + V) % p;
+                out[j + m2] = (U - V) % p;
             }
         }
 
-        t /= 2;
+        // keep growing up the transform size
         m *= 2;
     }
 
@@ -162,29 +137,27 @@ void ntt_plan_bfly_INTT(ntt_plan_bfly_t* plan, int64_t* inp, int64_t* out) {
     int64_t N = plan->N, p = plan->p;
 
     // temp indicies/values
-    int64_t i, j, a, b;
+    int64_t i, j, U, V;
 
+    // current transform stride
     int64_t m = 2;
 
     while (m <= N) {
+        // temporary variables for saving
         int64_t m2 = m / 2;
+        int64_t bnd = (N / m) * m;
 
-        int64_t t;
-        for (t = 0; t < m2; ++t) {
+        for (i = 0; i < m2; ++i) {
+            // current root of unity
+            int64_t wi = plan->IW[i * N / m];
 
-            // inverse root
-            int64_t wi = plan->IW[t * N / m];
+            // calculate interior butterfly
+            for (j = i; j < bnd + i; j += m) {
+                U = out[j];
+                V = (out[j + m2] * wi) % p;
 
-            // inner transform
-            int64_t g;
-            for (g = 0; g < N / m; ++g) {
-                i = g * m + t;
-                j = i + m2;
-                a = out[i];
-                b = out[j] * wi;
-
-                out[i] = (a + b) % p;
-                out[j] = (a - b) % p;
+                out[j] = (U + V) % p;
+                out[j + m2] = (U - V) % p;
             }
         }
 

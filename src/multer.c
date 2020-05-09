@@ -16,11 +16,14 @@ void ntt_multer_init(ntt_multer_t* multer, int64_t N) {
 
     int64_t prod_p = 1;
 
-    int64_t min_p = (max_word * max_word) * N / 8;
+    int64_t min_p = (max_word * max_word) * N;
+    //printf("%lli\n", min_p);
 
+
+    /*
     // current prime
     int64_t p = N * (min_p / N) + 1;
-
+    
     // generate new 'p'
     while (!ntt_isprime(p)) {
         p += N;
@@ -34,10 +37,12 @@ void ntt_multer_init(ntt_multer_t* multer, int64_t N) {
     prod_p *= p;
     p += N;
 
+    */
 
-    /*
+    int64_t p = N + 1;
 
-    while (prod_p < (max_word * max_word) * N / 8) {
+    // TODO: Figure out how to select different primes for transforms
+    while (prod_p < min_p) {
         // generate new 'p'
         while (!ntt_isprime(p)) {
             p += N;
@@ -51,8 +56,7 @@ void ntt_multer_init(ntt_multer_t* multer, int64_t N) {
         prod_p *= p;
         p += N;
 
-        break;
-    }*/
+    }
 
     multer->prod_p = prod_p;
 
@@ -73,7 +77,9 @@ void ntt_multer_init(ntt_multer_t* multer, int64_t N) {
     multer->CRT_p = malloc(sizeof(*multer->CRT_p) * multer->n_plans);
 
     for (i = 0; i < multer->n_plans; ++i) {
+        // compute the product of all 'p' except for the current
         multer->CRT_p[i].Ni = prod_p / multer->plans[i].p;
+        // compute the inverse of Ni (mod p)
         multer->CRT_p[i].d = ntt_modinv(multer->CRT_p[i].Ni, multer->plans[i].p);
     }
 
@@ -82,49 +88,51 @@ void ntt_multer_init(ntt_multer_t* multer, int64_t N) {
 
 
 void ntt_multer_mult(ntt_multer_t* multer, int64_t* A, int64_t* B, int64_t* C) {
-    int64_t i, j;
+    int64_t i;
 
     // apply forward NTT's on all plans
+    #pragma omp parallel for
     for (i = 0; i < multer->n_plans; ++i) {
         ntt_plan_bfly_NTT(&multer->plans[i], A, multer->nttA[i]);
         ntt_plan_bfly_NTT(&multer->plans[i], B, multer->nttB[i]);
     }
 
     // convolve via pointwise multiplication
+    #pragma omp parallel for
     for (i = 0; i < multer->n_plans; ++i) {
+        int64_t j;
         for (j = 0; j < multer->N; ++j) {
             multer->nttC[i][j] = (multer->nttA[i][j] * multer->nttB[i][j]) % multer->plans[i].p;
         }
     }
 
     // inverse NTT to find value in 'C'
+    #pragma omp parallel for
     for (i = 0; i < multer->n_plans; ++i) {
         ntt_plan_bfly_INTT(&multer->plans[i], multer->nttC[i], multer->C[i]);
     }
 
+    // now, combine to get the actual 'digits'
     if (multer->n_plans == 1) {
-        // just copy it over
+        // just copy it over (no CRT required)
         memcpy(C, multer->C[0], sizeof(*C) * multer->N);
     } else {
         // Now, we have found 'C' modulo all the 'p' from plans, so we must combine via CRT
         for (i = 0; i < multer->N; ++i) {
             int64_t C_i = 0;
 
-
             // sum c_i * N_i * d_i
+            int64_t j;
             for (j = 0; j < multer->n_plans; ++j) {
                 C_i += ntt_modmul(multer->CRT_p[j].Ni, ntt_modmul(multer->CRT_p[j].d, multer->C[j][i], multer->prod_p), multer->prod_p);
                 C_i %= multer->prod_p;
             }
 
+            // now, we have the unique solution mod (prod_p), which
+            //   should be large enough for any 'digit'
             if (C_i < 0) C_i += multer->prod_p;
             C[i] = C_i;
         }
-
     }
-
-    // TODO: use CRT to combine them
-
-    //memcpy(C, multer->C[0], sizeof(*C) * multer->N);
 }
 

@@ -338,6 +338,7 @@ int main(int argc, char** argv) {
         ntt_multer_t multer = NTT_MULTER_EMPTY;
         ntt_multer_init(&multer, N);
 
+
         /*
         printf("A: ");
         printarr(A, N);
@@ -346,7 +347,9 @@ int main(int argc, char** argv) {
         printf("B: ");
         printarr(B, N);
         printf("\n");
+        */
 
+        /*
         // print the transform size
         printf("N = %lli\n", multer.N);
 
@@ -358,9 +361,6 @@ int main(int argc, char** argv) {
         }
         printf("\n");
         */
-
-
-
         /* computation */
 
         double st = ntt_time();
@@ -369,7 +369,7 @@ int main(int argc, char** argv) {
         ntt_multer_mult(&multer, A, B, C);
 
         st = ntt_time() - st;
-        printf("time: %.3lf\n", st);
+        fprintf(stderr, "time: %.3lf\n", st);
 
         // handle carry propogation
         int64_t carry = 0;
@@ -423,7 +423,7 @@ int main(int argc, char** argv) {
 
         Cs[out_i] = '\0';
         
-        //printf("0x%s\n", Cs);
+        printf("0x%s\n", Cs);
         free(Cs);
 
     } else {
