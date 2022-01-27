@@ -3,7 +3,7 @@
 
 # how many hex digits
 #HEXDIGS=$((32))
-HEXDIGS=$((1024 * 1024 * 64))
+HEXDIGS=$((1024))
 
 rand() {
     openssl rand -hex $HEXDIGS
