@@ -110,8 +110,8 @@ void ntt_plan_bfly_NTT(ntt_plan_bfly_t* plan, int64_t* inp, int64_t* out) {
                 U = out[j];
                 V = (out[j + m2] * wi) % p;
 
-                out[j] = (U + V) % p;
-                out[j + m2] = (U - V) % p;
+                out[j] = (((U + V) % p) + p) % p;
+                out[j + m2] = (((U - V) % p) + p) % p;
             }
         }
 
@@ -156,8 +156,8 @@ void ntt_plan_bfly_INTT(ntt_plan_bfly_t* plan, int64_t* inp, int64_t* out) {
                 U = out[j];
                 V = (out[j + m2] * wi) % p;
 
-                out[j] = (U + V) % p;
-                out[j + m2] = (U - V) % p;
+                out[j] = (((U + V) % p) + p) % p;
+                out[j + m2] = (((U - V) % p) + p) % p;
             }
         }
 

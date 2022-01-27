@@ -3,7 +3,9 @@
 
 # how many hex digits
 #HEXDIGS=$((32))
-HEXDIGS=$((1024))
+if [ -z "${HEXDIGS}" ]; then
+    HEXDIGS=$((1024))
+fi
 
 rand() {
     openssl rand -hex $HEXDIGS
@@ -20,4 +22,5 @@ echo $B > /tmp/B.txt
 
 # ensure they are the same output
 cmp /tmp/C_py.txt /tmp/C_ntt.txt && echo "Success!" || echo "Failure!"
-
+echo "Check /tmp/A.txt /tmp/B.txt /tmp/C_py.txt /tmp/C_ntt.txt"
+echo "Run with 'HEXDIGS=1234 $0' to test different sizes"
